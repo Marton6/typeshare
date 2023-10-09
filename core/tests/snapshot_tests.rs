@@ -96,6 +96,9 @@ macro_rules! output_file_for_ident {
     (go) => {
         "output.go"
     };
+    (python) => {
+        "output.py"
+    }
 }
 
 /// Simplifies the construction of `Language` instances for each language.
@@ -203,12 +206,26 @@ macro_rules! language_instance {
         language_instance!(go { })
     };
 
-     // Go with configuration fields forwarded
+    // Go with configuration fields forwarded
     (go {$($field:ident: $val:expr),* $(,)?}) => {
         #[allow(clippy::needless_update)]
         Box::new(typeshare_core::language::Go {
              package: "proto".to_string(),
              no_version_header: true,
+             $($field: $val,)*
+            ..Default::default()
+        })
+    };
+
+    (python) => {
+        language_instance!(python { })
+    };
+
+    // Python with configuration fields forwarded
+    (python {$($field:ident: $val:expr),* $(,)?}) => {
+        #[allow(clippy::needless_update)]
+        Box::new(typeshare_core::language::Python {
+             package: "proto".to_string(),
              $($field: $val,)*
             ..Default::default()
         })
@@ -462,7 +479,7 @@ tests! {
     test_default_decorators: [swift { default_decorators: vec!["Sendable".into(), "Identifiable".into()]}];
     test_default_generic_constraints: [swift { default_generic_constraints: typeshare_core::language::GenericConstraints::from_config(vec!["Sendable".into(), "Identifiable".into()]) }];
     test_i54_u53_type: [swift, kotlin, scala,  typescript, go];
-    test_serde_default_struct: [swift, kotlin, scala,  typescript, go];
+    test_serde_default_struct: [swift, kotlin, scala,  typescript, go, python];
     test_serde_iso8601: [
         swift {
             prefix: String::new(),
@@ -481,7 +498,7 @@ tests! {
         typescript {
             type_mappings: super::TYPESCRIPT_MAPPINGS.clone(),
         },
-         go {
+        go {
             type_mappings: super::GO_MAPPINGS.clone(),
         },
     ];
@@ -508,7 +525,7 @@ tests! {
             uppercase_acronyms: vec!["URL".to_string()],
         },
     ];
-    test_type_alias: [ swift { prefix: "OP".to_string(), }, kotlin, scala,  typescript, go ];
+    test_type_alias: [ swift { prefix: "OP".to_string(), }, kotlin, scala,  typescript, go, python ];
     test_optional_type_alias: [swift, kotlin, scala, typescript, go];
     test_serialized_as: [ swift { prefix: "OP".to_string(), }, kotlin, scala,  typescript, go ];
     test_serialized_as_tuple: [

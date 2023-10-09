@@ -14,6 +14,7 @@ path = "src/main.rs"
 
 [features]
 go = []
+python = []
 
 [dependencies]
 clap = { version = "3", features = ["cargo"] }
