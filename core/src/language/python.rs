@@ -111,7 +111,7 @@ impl Language for Python {
 
         writeln!(
             w,
-            "{}={}\n",
+            "{} = {}\n",
             &ty.id.original,
             self.format_type(&ty.r#type, &[])
                 .map_err(|e| std::io::Error::new(std::io::ErrorKind::Other, e))?
@@ -132,6 +132,7 @@ impl Language for Python {
             .iter()
             .try_for_each(|f| self.write_field(w, f, rs.generic_types.as_slice()))?;
 
+        writeln!(w)?;
         Ok(())
     }
 }
@@ -169,7 +170,7 @@ impl Python {
         }
         writeln!(
             w,
-            "\t{}:{}{}",
+            "\t{}: {}{}",
             field.id.original.to_string(),
             type_name,
             field.ty.is_optional().then_some("|None").unwrap_or_default(),
