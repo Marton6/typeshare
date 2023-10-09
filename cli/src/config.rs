@@ -49,6 +49,13 @@ pub struct GoParams {
     pub uppercase_acronyms: Vec<String>,
 }
 
+#[derive(Default, Serialize, Deserialize, PartialEq, Eq, Debug)]
+#[serde(default)]
+#[cfg(feature = "python")]
+pub struct PythonParams {
+    pub type_mappings: HashMap<String, String>,
+}
+
 /// The paramters that are used to configure the behaviour of typeshare
 /// from the configuration file `typeshare.toml`
 #[derive(Serialize, Deserialize, Default, Debug, PartialEq)]
@@ -60,6 +67,8 @@ pub(crate) struct Config {
     pub scala: ScalaParams,
     #[cfg(feature = "go")]
     pub go: GoParams,
+    #[cfg(feature = "python")]
+    pub python: PythonParams,
 }
 
 pub(crate) fn store_config(config: &Config, file_path: Option<&str>) -> Result<(), io::Error> {

@@ -13,8 +13,6 @@ use std::collections::{HashMap, HashSet};
 /// All information needed to generate Go type-code
 #[derive(Default)]
 pub struct Python {
-    /// Name of the Python package.
-    pub package: String,
     /// Conversions from Rust type names to Go type names.
     pub type_mappings: HashMap<String, String>,
 }

@@ -11,6 +11,9 @@ use std::{fs, path::Path};
 use typeshare_core::language::GenericConstraints;
 #[cfg(feature = "go")]
 use typeshare_core::language::Go;
+#[cfg(feature = "python")]
+use typeshare_core::language::Python;
+
 use typeshare_core::{
     language::{Kotlin, Language, Scala, SupportedLanguage, Swift, TypeScript},
     parser::ParsedData,
@@ -32,11 +35,7 @@ const ARG_CONFIG_FILE_NAME: &str = "CONFIGFILENAME";
 const ARG_GENERATE_CONFIG: &str = "generate-config-file";
 const ARG_OUTPUT_FILE: &str = "output-file";
 
-#[cfg(feature = "go")]
-const AVAILABLE_LANGUAGES: [&str; 5] = ["kotlin", "scala", "swift", "typescript", "go"];
-
-#[cfg(not(feature = "go"))]
-const AVAILABLE_LANGUAGES: [&str; 4] = ["kotlin", "scala", "swift", "typescript"];
+const AVAILABLE_LANGUAGES: [&str; 6] = ["kotlin", "scala", "swift", "typescript", "go", "python"];
 
 fn build_command() -> Command<'static> {
     command!("typeshare")
@@ -212,6 +211,10 @@ fn main() {
             type_mappings: config.go.type_mappings,
             uppercase_acronyms: config.go.uppercase_acronyms,
             ..Default::default()
+        }),
+        #[cfg(feature = "python")]
+        Some(SupportedLanguage::Python) => Box::new(Python {
+            type_mappings: config.python.type_mappings,
         }),
         #[cfg(not(feature = "go"))]
         Some(SupportedLanguage::Go) => {
