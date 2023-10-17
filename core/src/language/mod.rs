@@ -103,6 +103,7 @@ pub trait Language {
                 RustItem::Enum(e) => self.write_enum(writable, e)?,
                 RustItem::Struct(s) => self.write_struct(writable, s)?,
                 RustItem::Alias(a) => self.write_type_alias(writable, a)?,
+                RustItem::Method(m) => {}
             }
         }
 
@@ -300,6 +301,7 @@ pub trait Language {
                         &e.shared().id.original,
                     )],
                     decorators: HashMap::new(),
+                    methods: vec![],
                 },
             )?;
         }

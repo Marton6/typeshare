@@ -1,15 +1,17 @@
-use std::io::Write;
+use std::io::{self, Write};
 
 use crate::language::SupportedLanguage;
 use crate::parser::ParsedData;
 use crate::rename::RenameExt;
-use crate::rust_types::{RustItem, RustTypeFormatError, SpecialRustType};
+use crate::rust_types::{RustItem, RustMethod, RustTypeFormatError, SpecialRustType};
 use crate::{
     language::Language,
     rust_types::{RustEnum, RustEnumVariant, RustField, RustStruct, RustTypeAlias},
     topsort::topsort,
 };
+use itertools::Itertools;
 use std::collections::{HashMap, HashSet};
+use std::fmt::format;
 
 /// All information needed to generate Go type-code
 #[derive(Default)]
@@ -62,6 +64,7 @@ impl Language for Go {
                 RustItem::Enum(e) => self.write_enum(w, e, &types_mapping_to_struct)?,
                 RustItem::Struct(s) => self.write_struct(w, s)?,
                 RustItem::Alias(a) => self.write_type_alias(w, a)?,
+                RustItem::Method(m) => {}
             }
         }
 
@@ -157,7 +160,11 @@ impl Language for Go {
             .iter()
             .try_for_each(|f| self.write_field(w, f, rs.generic_types.as_slice()))?;
 
-        writeln!(w, "}}")
+        writeln!(w, "}}")?;
+
+        rs.methods
+            .iter()
+            .try_for_each(|m| self.write_method(w, m, rs))
     }
 }
 
@@ -391,6 +398,33 @@ func ({short_name} {full_name}) MarshalJSON() ([]byte, error) {{
         }
     }
 
+    fn write_method(
+        &mut self,
+        w: &mut dyn Write,
+        m: &RustMethod,
+        s: &RustStruct,
+    ) -> std::io::Result<()> {
+        writeln!(
+            w,
+            "func ({} {}) {}({}) {} {{}}",
+            "s",
+            s.id.original, // TODO: make receiver into pointer based on parsed Rust receiver
+            self.format_method_name(m.name.clone(), true), // TODO: get method visibilty from rust code
+            m.parameters
+                .iter()
+                .flat_map(|p| {
+                    let type_name = self.format_type(&p.param_type, &[]).unwrap();
+                    //                        .map_err(|e| std::io::Error::new(std::io::ErrorKind::Other, e))?;
+
+                    Ok::<String, io::Error>(format!("{} {}", p.name, type_name))
+                })
+                .join(", "),
+            self.format_type(&m.return_type, &[]).unwrap()
+        )?;
+
+        Ok(())
+    }
+
     fn write_field(
         &mut self,
         w: &mut dyn Write,
@@ -407,12 +441,7 @@ func ({short_name} {full_name}) MarshalJSON() ([]byte, error) {{
 
         write_comments(w, 1, &field.comments)?;
 
-        let type_name = match field.type_override(SupportedLanguage::Go) {
-            Some(type_override) => type_override.to_owned(),
-            None => self
-                .format_type(&field.ty, generic_types)
-                .map_err(|e| std::io::Error::new(std::io::ErrorKind::Other, e))?,
-        };
+        let type_name = self.type_name(field, generic_types)?;
 
         let go_type = self.acronyms_to_uppercase(&type_name);
         let is_optional = field.ty.is_optional() || field.has_default;
@@ -446,6 +475,27 @@ func ({short_name} {full_name}) MarshalJSON() ([]byte, error) {{
             name
         };
         self.acronyms_to_uppercase(&name)
+    }
+
+    fn format_method_name(&mut self, name: String, exported: bool) -> String {
+        if exported {
+            name.to_pascal_case()
+        } else {
+            name.to_camel_case()
+        }
+    }
+
+    fn type_name(
+        &mut self,
+        field: &RustField,
+        generic_types: &[String],
+    ) -> std::io::Result<String> {
+        Ok(match field.type_override(SupportedLanguage::Go) {
+            Some(type_override) => type_override.to_owned(),
+            None => self
+                .format_type(&field.ty, generic_types)
+                .map_err(|e| std::io::Error::new(std::io::ErrorKind::Other, e))?,
+        })
     }
 }
 

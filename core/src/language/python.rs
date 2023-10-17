@@ -54,6 +54,7 @@ impl Language for Python {
                 RustItem::Enum(e) => self.write_enum(w, e, &types_mapping_to_struct)?,
                 RustItem::Struct(s) => self.write_struct(w, s)?,
                 RustItem::Alias(a) => self.write_type_alias(w, a)?,
+                RustItem::Method(_) => todo!(),
             }
         }
 
@@ -72,7 +73,11 @@ impl Language for Python {
         generic_types: &[String],
     ) -> Result<String, RustTypeFormatError> {
         Ok(match special_ty {
-            SpecialRustType::Vec(rtype) | SpecialRustType::Array(rtype, _) | SpecialRustType::Slice(rtype)=> format!("list[{}]", self.format_type(rtype, generic_types)?),
+            SpecialRustType::Vec(rtype)
+            | SpecialRustType::Array(rtype, _)
+            | SpecialRustType::Slice(rtype) => {
+                format!("list[{}]", self.format_type(rtype, generic_types)?)
+            }
             SpecialRustType::Option(rtype) => {
                 format!("{}|None", self.format_type(rtype, generic_types)?)
             }
@@ -122,11 +127,7 @@ impl Language for Python {
 
     fn write_struct(&mut self, w: &mut dyn Write, rs: &RustStruct) -> std::io::Result<()> {
         write_comments(w, 0, &rs.comments)?;
-        writeln!(
-            w,
-            "class {}:",
-            &rs.id.renamed
-        )?;
+        writeln!(w, "class {}:", &rs.id.renamed)?;
 
         rs.fields
             .iter()
@@ -173,7 +174,11 @@ impl Python {
             "\t{}: {}{}",
             field.id.original.to_string(),
             type_name,
-            field.ty.is_optional().then_some("|None").unwrap_or_default(),
+            field
+                .ty
+                .is_optional()
+                .then_some("|None")
+                .unwrap_or_default(),
         )?;
 
         Ok(())

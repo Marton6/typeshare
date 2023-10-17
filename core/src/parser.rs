@@ -1,4 +1,4 @@
-use crate::rust_types::FieldDecorator;
+use crate::rust_types::{FieldDecorator, RustMethod, RustMethodParameter};
 use crate::{
     language::SupportedLanguage,
     rename::RenameExt,
@@ -13,7 +13,7 @@ use std::{
     collections::{HashMap, HashSet},
     convert::TryFrom,
 };
-use syn::{Attribute, Fields, ItemEnum, ItemStruct, ItemType};
+use syn::{Attribute, Fields, ImplItem, Item, ItemEnum, ItemImpl, ItemStruct, ItemType, Type};
 use syn::{GenericParam, Meta, NestedMeta};
 use thiserror::Error;
 
@@ -47,6 +47,15 @@ impl ParsedData {
             RustItem::Struct(s) => self.structs.push(s),
             RustItem::Enum(e) => self.enums.push(e),
             RustItem::Alias(a) => self.aliases.push(a),
+            RustItem::Method(m) => {
+                self.structs
+                    .iter_mut()
+                    .find(|s| s.id == m.parent_struct_id)
+                    .map_or_else(
+                        || panic!("did not find struct for method"),
+                        |s| s.methods.push(m),
+                    );
+            }
         }
     }
 }
@@ -95,6 +104,12 @@ pub fn parse(input: &str) -> Result<ParsedData, ParseError> {
 
     for item in flatten_items(source.items.iter()) {
         match item {
+            syn::Item::Impl(i) if has_typeshare_annotation(&i.attrs) => {
+                parse_impl(i)?
+                    .into_iter()
+                    .for_each(|r| parsed_data.push_rust_thing(r));
+            }
+
             syn::Item::Struct(s) if has_typeshare_annotation(&s.attrs) => {
                 parsed_data.push_rust_thing(parse_struct(s)?);
             }
@@ -126,6 +141,61 @@ fn flatten_items<'a>(
         }
         .into_iter()
     })
+}
+
+fn parse_impl(i: &ItemImpl) -> Result<Vec<RustItem>, ParseError> {
+    Ok(match i.self_ty.as_ref() {
+        Type::Path(path) => i
+            .items
+            .iter()
+            .flat_map(|item| match item {
+                ImplItem::Method(m) => Ok::<RustItem, ParseError>(RustItem::Method(RustMethod {
+                    parent_struct_id: get_ident(path.path.get_ident(), &i.attrs, &None),
+                    name: m.sig.ident.to_string(),
+                    return_type: RustType::try_from(match &m.sig.output {
+                        syn::ReturnType::Type(_, ty) => ty.as_ref(),
+                        syn::ReturnType::Default => {
+                            panic!("Found default in return type")
+                        }
+                    })?,
+                    parameters: m
+                        .sig
+                        .inputs
+                        .iter()
+                        .flat_map(|f| match f {
+                            syn::FnArg::Receiver(_) => panic!("receiver not supported"),
+                            syn::FnArg::Typed(p) => {
+                                println!("aicia");
+                                Some(RustMethodParameter {
+                                    name: match p.pat.as_ref() {
+                                        syn::Pat::Ident(id) => id.ident.to_string(),
+                                        _ => panic!("method paramtere pattern not supported"),
+                                    },
+                                    param_type: RustType::try_from(p.ty.as_ref()).unwrap(),
+                                })
+                            }
+                        })
+                        .collect(),
+                })),
+                _ => {
+                    panic!("error parsing impl block, found non-method item")
+                }
+            })
+            .collect(),
+        _ => todo!(),
+    })
+
+    // Ok(match &i.items {
+    //     ImplItem::Method(m) => RustItem::Method(RustMethod{
+    //         parent_struct_id: Id{
+    //             original: i.self_ty,
+    //             renamed: "".to_string(),
+    //         },
+    //         name: "".to_string(),
+    //         return_type: (),
+    //         parameters: vec![],
+    //     })
+    // })
 }
 
 /// Parses a struct into a definition that more succinctly represents what
@@ -195,6 +265,7 @@ fn parse_struct(s: &ItemStruct) -> Result<RustItem, ParseError> {
                 fields,
                 comments: parse_comment_attrs(&s.attrs),
                 decorators: get_decorators(&s.attrs),
+                methods: vec![],
             })
         }
         // Tuple structs
@@ -224,6 +295,7 @@ fn parse_struct(s: &ItemStruct) -> Result<RustItem, ParseError> {
             fields: vec![],
             comments: parse_comment_attrs(&s.attrs),
             decorators: get_decorators(&s.attrs),
+            methods: vec![],
         }),
     })
 }

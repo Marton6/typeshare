@@ -43,6 +43,21 @@ pub struct RustStruct {
     pub comments: Vec<String>,
     /// Attributes that exist for this struct.
     pub decorators: HashMap<SupportedLanguage, Vec<String>>,
+    pub methods: Vec<RustMethod>,
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct RustMethod {
+    pub parent_struct_id: Id,
+    pub name: String,
+    pub return_type: RustType,
+    pub parameters: Vec<RustMethodParameter>,
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct RustMethodParameter {
+    pub name: String,
+    pub param_type: RustType,
 }
 
 /// Rust type alias.
@@ -590,4 +605,6 @@ pub enum RustItem {
     Enum(RustEnum),
     /// A `type` definition or newtype struct.
     Alias(RustTypeAlias),
+
+    Method(RustMethod),
 }
